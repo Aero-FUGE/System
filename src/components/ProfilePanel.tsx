@@ -1,0 +1,263 @@
+import React from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { X, User, Trophy, BarChart3, Clock, Calendar, Edit2, Check, Shield } from 'lucide-react';
+import { Achievement, UserStats } from '../types';
+import { cn } from '../lib/utils';
+import { getLevelFromXP, getNextLevelXP } from '../constants/levels';
+import { IconMap } from '../constants/icons';
+import { soundManager } from '../services/soundService';
+
+interface ProfilePanelProps {
+  isOpen: boolean;
+  onClose: () => void;
+  stats: UserStats;
+  achievements: Achievement[];
+  onUpdateNickname: (name: string) => void;
+  onToggleSound: (enabled: boolean) => void;
+}
+
+export const ProfilePanel: React.FC<ProfilePanelProps> = ({
+  isOpen,
+  onClose,
+  stats,
+  achievements,
+  onUpdateNickname,
+  onToggleSound,
+}) => {
+  const [isEditing, setIsEditing] = React.useState(false);
+  const [tempNickname, setTempNickname] = React.useState(stats.nickname);
+
+  const levelInfo = getLevelFromXP(stats.xp);
+  const nextLevelXP = getNextLevelXP(levelInfo.level);
+  const currentLevelThreshold = levelInfo.xpThreshold;
+  const progressInLevel = stats.xp - currentLevelThreshold;
+  const totalInLevel = nextLevelXP - currentLevelThreshold;
+  const xpProgressPercent = totalInLevel > 0 ? Math.min(100, (progressInLevel / totalInLevel) * 100) : 100;
+
+  const unlockedAchievements = achievements.filter(a => a.unlockedAt);
+
+  const handleSaveNickname = () => {
+    onUpdateNickname(tempNickname);
+    setIsEditing(false);
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0, x: -100 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -100 }}
+          className="fixed top-0 left-0 h-[100dvh] w-full max-w-md bg-background-dark/95 backdrop-blur-3xl border-r border-primary/20 z-[80] flex flex-col shadow-2xl"
+        >
+          {/* Header */}
+          <div className="p-6 border-b border-primary/20 flex items-center justify-between bg-primary/5">
+            <div className="flex items-center gap-3">
+              <User className="text-primary" />
+              <h2 className="text-xl font-bold text-primary tracking-tighter uppercase">个人档案 <span className="text-white/20 font-light ml-2">USER PROFILE</span></h2>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-white/10 rounded-full text-white/60 transition-colors"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-6 space-y-8">
+            {/* Identity Card */}
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-6 relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-4 opacity-10">
+                <Shield size={80} className="text-primary" />
+              </div>
+              
+              <div className="relative z-10">
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="relative shrink-0">
+                    <div className="w-16 h-16 rounded-2xl bg-primary/20 border border-primary/40 flex items-center justify-center text-primary shadow-[0_0_20px_rgba(13,242,242,0.2)]">
+                      <User size={32} />
+                    </div>
+                    <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-background-dark border-2 border-primary flex items-center justify-center text-[10px] font-bold text-primary shadow-lg">
+                      Lv{levelInfo.level}
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    {isEditing ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          value={tempNickname}
+                          onChange={(e) => setTempNickname(e.target.value)}
+                          className="bg-white/10 border border-primary/30 rounded px-2 py-1 text-white text-lg font-bold outline-none w-full"
+                          autoFocus
+                        />
+                        <button onClick={handleSaveNickname} className="p-1.5 bg-primary text-background-dark rounded">
+                          <Check size={16} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-xl font-bold text-white truncate">{stats.nickname}</h3>
+                        <button onClick={() => setIsEditing(true)} className="text-white/20 hover:text-primary transition-colors shrink-0">
+                          <Edit2 size={14} />
+                        </button>
+                      </div>
+                    )}
+                    <div className="text-primary font-bold text-xs uppercase tracking-[0.2em] mt-1 drop-shadow-[0_0_8px_rgba(13,242,242,0.5)]">
+                      {levelInfo.identity}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex justify-between items-end">
+                    <div className="flex flex-col">
+                      <span className="text-[8px] uppercase tracking-widest text-white/40 mb-1">经验进度</span>
+                      <span className="text-xs font-mono text-white">
+                        {stats.xp} <span className="text-white/20">/ {nextLevelXP}</span>
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[8px] uppercase tracking-widest text-primary/60 mb-1 block">距离升级</span>
+                      <span className="text-xs font-mono text-primary">
+                        {nextLevelXP - stats.xp} XP
+                      </span>
+                    </div>
+                  </div>
+                  <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden border border-white/10 p-[1px]">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${xpProgressPercent}%` }}
+                      className="h-full bg-gradient-to-r from-primary/40 to-primary rounded-full shadow-[0_0_15px_rgba(13,242,242,0.6)]"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Stats Grid */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white/5 border border-white/5 rounded-xl p-4">
+                <div className="flex items-center gap-2 text-white/40 mb-2">
+                  <BarChart3 size={14} />
+                  <span className="text-[10px] uppercase tracking-widest">累计闭环</span>
+                </div>
+                <div className="text-2xl font-bold text-primary">{stats.totalRingsCompleted}</div>
+              </div>
+              <div className="bg-white/5 border border-white/5 rounded-xl p-4">
+                <div className="flex items-center gap-2 text-white/40 mb-2">
+                  <Trophy size={14} />
+                  <span className="text-[10px] uppercase tracking-widest">累计任务</span>
+                </div>
+                <div className="text-2xl font-bold text-primary">{stats.totalTasksCompleted}</div>
+              </div>
+              <div className="bg-white/5 border border-white/5 rounded-xl p-4">
+                <div className="flex items-center gap-2 text-white/40 mb-2">
+                  <Clock size={14} />
+                  <span className="text-[10px] uppercase tracking-widest">推进时间</span>
+                </div>
+                <div className="text-2xl font-bold text-primary">{Math.round(stats.totalTimeSpent / 60)}h</div>
+              </div>
+              <div className="bg-white/5 border border-white/5 rounded-xl p-4">
+                <div className="flex items-center gap-2 text-white/40 mb-2">
+                  <Calendar size={14} />
+                  <span className="text-[10px] uppercase tracking-widest">连续天数</span>
+                </div>
+                <div className="text-2xl font-bold text-primary">{stats.streakDays}d</div>
+              </div>
+            </div>
+
+            {/* System Settings */}
+            <div className="space-y-4">
+              <h4 className="text-[10px] uppercase tracking-widest text-white/40 font-bold flex items-center gap-2">
+                <Shield size={12} />
+                系统设置 SYSTEM SETTINGS
+              </h4>
+              <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center justify-between">
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-white">按钮交互音效</span>
+                  <span className="text-[8px] text-white/40 uppercase tracking-tighter">UI CLICK FEEDBACK</span>
+                </div>
+                <button 
+                  onClick={() => onToggleSound(!stats.soundEnabled)}
+                  className={cn(
+                    "w-12 h-6 rounded-full transition-colors relative",
+                    stats.soundEnabled ? "bg-primary" : "bg-white/10"
+                  )}
+                >
+                  <motion.div 
+                    animate={{ x: stats.soundEnabled ? 24 : 4 }}
+                    className="absolute top-1 left-0 w-4 h-4 bg-background-dark rounded-full"
+                  />
+                </button>
+              </div>
+            </div>
+
+            {/* Database Sync Help */}
+            <div className="space-y-4">
+              <h4 className="text-[10px] uppercase tracking-widest text-white/40 font-bold flex items-center gap-2">
+                <BarChart3 size={12} />
+                数据库同步 DATABASE SYNC
+              </h4>
+              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 space-y-2">
+                <div className="text-xs font-bold text-red-400 flex items-center gap-2">
+                  <Shield size={12} />
+                  同步报错？
+                </div>
+                <p className="text-[10px] text-white/60 leading-relaxed">
+                  如果左上角显示“同步失败”或报错 <code className="text-red-300">Could not find table</code>，说明你的 Supabase 数据库尚未初始化。
+                </p>
+                <div className="pt-2">
+                  <a 
+                    href="https://supabase.com/dashboard" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-[10px] text-primary hover:underline font-bold"
+                  >
+                    前往 Supabase 运行初始化脚本 (SUPABASE_SETUP.sql) →
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            {/* Achievements List */}
+            <div className="space-y-4">
+              <h4 className="text-[10px] uppercase tracking-widest text-white/40 font-bold flex items-center gap-2">
+                <Trophy size={12} />
+                已获得成就 ({unlockedAchievements.length})
+              </h4>
+              <div className="grid grid-cols-4 gap-3">
+                {unlockedAchievements.map(a => {
+                  const Icon = IconMap[a.icon] || Trophy;
+                  return (
+                    <div 
+                      key={a.id} 
+                      className="aspect-square bg-primary/10 border border-primary/30 rounded-lg flex items-center justify-center text-primary group relative"
+                    >
+                      <Icon size={20} />
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-32 p-2 bg-background-dark border border-primary/30 rounded text-[8px] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                        <div className="font-bold text-primary mb-1">{a.title}</div>
+                        <div className="text-white/60">{a.description}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {Array.from({ length: Math.max(0, 8 - unlockedAchievements.length) }).map((_, i) => (
+                  <div key={i} className="aspect-square bg-white/5 border border-white/5 rounded-lg flex items-center justify-center text-white/10">
+                    <Trophy size={16} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6 border-t border-primary/20 bg-background-dark/50">
+            <div className="flex items-center gap-2 text-[10px] text-primary/40 uppercase tracking-widest">
+              <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+              身份识别完成 | 神经链路已同步
+            </div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};
